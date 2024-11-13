@@ -1,0 +1,157 @@
+import os
+from datetime import datetime
+
+FILENAME = "tareas.txt"
+
+class Tarea:
+    """Representa una tarea individual."""
+    def __init__(self, id, nombre, fecha):
+        self.id = id
+        self.nombre = nombre
+        self.fecha = fecha
+
+    @classmethod
+    def from_line(cls, line):
+        """Crea una tarea a partir de una línea de archivo de texto."""
+        parts = line.strip().split(';')
+        return cls(int(parts[0]), parts[1], parts[2])
+
+    def to_line(self):
+        """Convierte la tarea en una línea para guardar en el archivo."""
+        return f"{self.id};{self.nombre};{self.fecha}\n"
+
+
+class TareaRepositorio:
+    """Gestiona el almacenamiento y recuperación de tareas."""
+    def __init__(self, filename=FILENAME):
+        self.filename = filename
+
+    def cargar_tareas(self):
+        """Carga las tareas desde el archivo de texto."""
+        if not os.path.exists(self.filename):
+            return []
+        with open(self.filename, 'r') as file:
+            return [Tarea.from_line(line) for line in file.readlines()]
+
+    def guardar_tareas(self, tareas):
+        """Guarda las tareas en el archivo de texto."""
+        with open(self.filename, 'w') as file:
+  j1          for tarea in tareas:
+                file.write(tarea.to_line())
+
+
+class TareaServicio:
+    """Gestiona las operaciones de creación, edición y eliminación de tareas."""
+    def __init__(self, repositorio):
+        self.repositorio = repositorio
+        self.tareas = self.repositorio.cargar_tareas()
+
+    def mostrar_tareas(self):
+        """Muestra todas las tareas."""
+        if not self.tareas:
+            print("No hay tareas disponibles.")
+            return
+        print("\nLista de Tareas:")
+        for tarea in self.tareas:
+            print(f"{tarea.id}. {tarea.nombre} - Fecha: {tarea.fecha}")
+
+    def agregar_tarea(self, nombre, fecha):
+        """Agrega una nueva tarea."""
+        tarea_id = max((tarea.id for tarea in self.tareas), default=0) + 1
+        nueva_tarea = Tarea(tarea_id, nombre, fecha)
+        self.tareas.append(nueva_tarea)
+        self.repositorio.guardar_tareas(self.tareas)
+        print("Tarea agregada con éxito.")
+
+    def editar_tarea(self, tarea_id, nuevo_nombre=None, nueva_fecha=None):
+        """Edita una tarea existente."""
+        tarea = next((t for t in self.tareas if t.id == tarea_id), None)
+        if not tarea:
+            print("ID de tarea no encontrado.")
+            return
+        tarea.nombre = nuevo_nombre or tarea.nombre
+        if nueva_fecha:
+            tarea.fecha = nueva_fecha
+        self.repositorio.guardar_tareas(self.tareas)
+        print("Tarea editada con éxito.")
+
+    def eliminar_tarea(self, tarea_id):
+        """Elimina una tarea existente."""
+        tarea = next((t for t in self.tareas if t.id == tarea_id), None)
+        if not tarea:
+            print("ID de tarea no encontrado.")
+            return
+        self.tareas.remove(tarea)
+        self.repositorio.guardar_tareas(self.tareas)
+        print("Tarea eliminada con éxito.")
+
+
+class GestorTareasUI:
+    """Interfaz de usuario para interactuar con el gestor de tareas."""
+    def __init__(self, servicio):
+        self.servicio = servicio
+
+    def menu(self):
+        """Muestra el menú principal."""
+        while True:
+            print("\nGestor de Tareas")
+            print("1. Ver tareas")
+            print("2. Agregar tarea")
+            print("3. Editar tarea")
+            print("4. Eliminar tarea")
+            print("5. Salir")
+            opcion = input("Seleccione una opción: ")
+            self.ejecutar_opcion(opcion)
+
+    def ejecutar_opcion(self, opcion):
+        if opcion == "1":
+            self.servicio.mostrar_tareas()
+        elif opcion == "2":
+            nombre = input("Ingrese el nombre de la tarea: ")
+            fecha = self.obtener_fecha_valida("Ingrese la fecha de la tarea (YYYY-MM-DD): ")
+            if fecha:
+                self.servicio.agregar_tarea(nombre, fecha)
+        elif opcion == "3":
+            self.servicio.mostrar_tareas()
+            tarea_id = self.obtener_id_valido("Ingrese el ID de la tarea a editar: ")
+            nuevo_nombre = input("Nuevo nombre (presione Enter para no cambiar): ")
+            nueva_fecha = self.obtener_fecha_valida("Nueva fecha (YYYY-MM-DD, Enter para no cambiar): ", True)
+            if tarea_id:
+                self.servicio.editar_tarea(tarea_id, nuevo_nombre, nueva_fecha)
+        elif opcion == "4":
+            self.servicio.mostrar_tareas()
+            tarea_id = self.obtener_id_valido("Ingrese el ID de la tarea a eliminar: ")
+            if tarea_id:
+                self.servicio.eliminar_tarea(tarea_id)
+        elif opcion == "5":
+            print("Saliendo del gestor de tareas.")
+            exit()
+        else:
+            print("Opción no válida. Intente de nuevo.")
+
+    def obtener_id_valido(self, mensaje):
+        """Obtiene un ID de tarea válido."""
+        try:
+            return int(input(mensaje))
+        except ValueError:
+            print("ID no válido. Intente de nuevo.")
+            return None
+
+    def obtener_fecha_valida(self, mensaje, opcional=False):
+        """Obtiene una fecha válida de entrada."""
+        while True:
+            fecha = input(mensaje)
+            if opcional and not fecha:
+                return None
+            try:
+                datetime.strptime(fecha, "%Y-%m-%d")
+                return fecha
+            except ValueError:
+                print("Fecha no válida. Intente de nuevo.")
+
+
+if __name__ == "__main__":
+    repositorio = TareaRepositorio()
+    servicio = TareaServicio(repositorio)
+    ui = GestorTareasUI(servicio)
+    ui.menu()
